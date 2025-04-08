@@ -3,6 +3,7 @@ import json
 import os
 import argparse
 import asyncio
+import random
 import sys
 
 from loguru import logger
@@ -95,48 +96,71 @@ async def main():
         logger.add(sys.stderr, level="INFO")
 
     async with TelegramClient(config["APP_NAME"], int(config["API_ID"]), config["API_HASH"]) as client:
-        me = await client.get_me()
-
-        tgroup = TelegramGroup(client, args.group)
-
         start_date = datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         if args.end:
             end_date = datetime.strptime(args.end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         else:
             end_date = datetime.now(timezone.utc)
 
-        logger.info(f"Fetching messages from {args.group} group from {start_date} to {end_date if end_date else 'now'}")
+        logger.info(f"Fetching messages from {args.group} group from {start_date} to {end_date}")
 
-        await tgroup.fetch_history(
-            start_date=start_date,
-            end_date=end_date,
-            limit=args.limit,
-        )
-
-        messages = tgroup.history
-
-        logger.info(f"Fetched {len(messages)} messages from {config['GROUP_NAME']} group.")
-
-        for message in messages[:5]:
-            logger.debug(json.dumps(message.to_dict(), default=str, ensure_ascii=False))
-
-        # Save messages to a file
+        # Setup output file
         output_dir = args.output
-        # create sub dir with the group name lowercase
         group_name = args.group.lower().replace(" ", "_")
         output_dir = str(os.path.join(output_dir, group_name))
         os.makedirs(output_dir, exist_ok=True)
-
         filename = f"{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.json"
         output_file = os.path.join(output_dir, filename)
 
         if os.path.exists(output_file):
             logger.warning(f"Output file `{output_file}` already exists. Overwriting.")
 
-        with open(output_file, "w") as f:
-            for message in messages:
-                message_str = json.dumps(message.to_dict(), default=str, ensure_ascii=False)
-                f.write(f"{message_str}\n")
+        # Process in batches
+        batch_size = 100
+        offset_date = end_date
+        total_messages = 0
+        all_messages = []
+
+        with open(output_file, "w", encoding="utf-8") as f:
+            while True:
+                batch_messages = []
+                logger.info(f"Fetching batch starting from {offset_date}")
+
+                async for message in client.iter_messages(
+                    args.group,
+                    offset_date=offset_date,
+                    limit=batch_size,
+                    wait_time=random.randint(1, 5),
+                ):
+                    if message.date < start_date:
+                        # We've gone past our desired date range
+                        break
+
+                    batch_messages.append(message)
+                    # Update offset for next batch
+                    offset_date = message.date
+
+                if not batch_messages:
+                    break
+
+                # Process this batch
+                for message in batch_messages:
+                    all_messages.append(message.to_dict())
+
+                # Update counter and log progress
+                total_messages += len(batch_messages)
+                logger.info(f"Processed {len(batch_messages)} messages (Total: {total_messages})")
+
+                # If we reached limit or got fewer messages than batch size
+                if len(batch_messages) < batch_size or (args.limit and total_messages >= args.limit):
+                    break
+
+                await asyncio.sleep(0.5)  # Be nice to the API
+
+            # Write all messages at once as a proper JSON array
+            json.dump(all_messages, f, default=str, ensure_ascii=False, indent=2)
+
+        logger.info(f"Successfully saved {total_messages} messages to {output_file}")
 
 
 if __name__ == "__main__":
