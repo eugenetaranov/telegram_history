@@ -205,7 +205,10 @@ async def main():
             with open(output_file, "w", encoding="utf-8") as f:
                 # Now fetch all messages in this ID range
                 async for message in client.iter_messages(
-                    entity, min_id=min_id, max_id=max_id + 1
+                    entity,
+                    min_id=min_id,
+                    max_id=max_id + 1,
+                    limit=args.limit,
                 ):
                     # Double check the date is in our range
                     if start_date <= message.date < end_date:
@@ -220,11 +223,6 @@ async def main():
                     # Log progress periodically
                     if total_messages % 100 == 0 and total_messages > 0:
                         logger.info(f"Processed {total_messages} messages so far")
-
-                    # Check limit
-                    if args.limit and total_messages >= args.limit:
-                        logger.info(f"Reached message limit ({args.limit})")
-                        break
 
                     # Be nice to the API
                     await asyncio.sleep(1)
