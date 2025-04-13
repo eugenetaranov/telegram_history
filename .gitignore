@@ -1,5 +1,6 @@
 **/.idea
 **/.venv
-.env
 **/*session*
 **/history
+**/__pycache__
+.env
