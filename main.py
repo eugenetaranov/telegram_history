@@ -5,11 +5,11 @@ import os
 import argparse
 import asyncio
 import sys
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 from loguru import logger
 from telethon import TelegramClient
 from dotenv import dotenv_values
-from datetime import datetime, timedelta, timezone
 
 
 def parse_args():
@@ -113,7 +113,7 @@ class TelegramGroup:
 
             return min_id
 
-        elif find_max_id:
+        if find_max_id:
             max_id = None
             async for message in self.client.iter_messages(
                 self.group_name, offset_date=end_date
@@ -128,8 +128,7 @@ class TelegramGroup:
 
             return max_id
 
-        else:
-            raise ValueError("Either min_id or max_id must be True")
+        raise ValueError("Either min_id or max_id must be True")
 
     async def fetch_history(
         self,
@@ -163,7 +162,8 @@ class TelegramGroup:
             return []
 
         logger.info(
-            f"Fetching messages between IDs {min_id} and {max_id}, up to {max_id - min_id + 1} messages."
+            f"Fetching messages between IDs {min_id} and {max_id}, "
+            f"up to {max_id - min_id + 1} messages."
         )
 
         self.history = []
@@ -235,80 +235,68 @@ class TelegramGroup:
         logger.info(f"Successfully saved {len(self.history)} messages to {file_path}")
 
 
+def get_date_range(args):
+    if args.day:
+        start_date = datetime.strptime(args.day, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        end_date = start_date + timedelta(days=1)
+    else:
+        if not args.start:
+            logger.error("Either --day or --start must be provided")
+            return None, None
+        start_date = datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        if args.end:
+            end_date = datetime.strptime(args.end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        else:
+            end_date = datetime.now(timezone.utc)
+    return start_date, end_date
+
+
+def get_output_file(output_dir, group_name, start_date, end_date, file_format):
+    group_name = group_name.lower().replace(" ", "_")
+    output_dir = str(os.path.join(output_dir, group_name))
+    os.makedirs(output_dir, exist_ok=True)
+
+    if file_format == "csv":
+        filename = f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}.csv"
+    elif file_format == "json":
+        filename = f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}.json"
+    else:
+        raise ValueError("Invalid format specified. Use 'json' or 'csv'.")
+
+    return os.path.join(output_dir, filename)
+
+
 async def main():
     args = parse_args()
     config = load_config()
 
     logger.remove()
-    if args.debug:
-        logger.add(sys.stderr, level="DEBUG")
-    else:
-        logger.add(sys.stderr, level="INFO")
+    logger.add(sys.stderr, level="DEBUG" if args.debug else "INFO")
+
+    start_date, end_date = get_date_range(args)
+    if not start_date or not end_date:
+        return
 
     async with TelegramClient(
         config["APP_NAME"], int(config["API_ID"]), config["API_HASH"]
     ) as client:
-        # Handle date parameters
-        if args.day:
-            start_date = datetime.strptime(args.day, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
-            end_date = start_date + timedelta(days=1)
-
-        else:
-            if not args.start:
-                logger.error("Either --day or --start must be provided")
-                return
-
-            start_date = datetime.strptime(args.start, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
-            if args.end:
-                end_date = datetime.strptime(args.end, "%Y-%m-%d").replace(
-                    tzinfo=timezone.utc
-                )
-            else:
-                end_date = datetime.now(timezone.utc)
-
         logger.info(
             f"Fetching messages from {args.group} between {start_date} and {end_date}"
         )
 
-        # Setup output file
-        output_dir = args.output
-        group_name = args.group.lower().replace(" ", "_")
-        output_dir = str(os.path.join(output_dir, group_name))
-        os.makedirs(output_dir, exist_ok=True)
-        if args.format == "csv":
-            filename = (
-                f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}.csv"
-            )
-        elif args.format == "json":
-            filename = (
-                f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}.json"
-            )
-
-        output_file = os.path.join(output_dir, filename)
-
+        output_file = get_output_file(args.output, args.group, start_date, end_date, args.format)
         if os.path.exists(output_file):
             logger.warning(f"Output file {output_file} already exists. Overwriting.")
 
-        tgroup = TelegramGroup(client=client, group_name=args.group)
-
-        await tgroup.fetch_history(
-            start_date=start_date,
-            end_date=end_date,
-            limit=args.limit,
-        )
+        tg_group = TelegramGroup(client=client, group_name=args.group)
+        await tg_group.fetch_history(start_date, end_date, limit=args.limit)
 
         if args.format == "csv":
             logger.info("Saving messages in CSV format.")
-            tgroup.save_csv(output_file)
-            return
-
-        elif args.format == "json":
+            tg_group.save_csv(output_file)
+        else:
             logger.info("Saving messages in JSON format.")
-            tgroup.save_json(output_file)
+            tg_group.save_json(output_file)
 
 
 if __name__ == "__main__":
