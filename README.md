@@ -54,6 +54,10 @@ python main.py --group "GROUP_NAME" --day "YYYY-MM-DD" --format json
 - `--limit`: Maximum number of messages to fetch
 - `--debug`: Enable debug logging
 
+### Note on Telegram Sessions
+
+When you run this application for the first time, Telethon will create a local `.session` file storing your login data. Keep this file secure to protect your credentials, and do not commit it to version control.
+
 ## Examples
 
 Fetch messages from a specific day:
