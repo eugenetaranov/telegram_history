@@ -1,11 +1,11 @@
 #!/usr/bin/env python
+import csv
 import json
 import os
 import argparse
 import asyncio
 import sys
 from dataclasses import dataclass
-
 from loguru import logger
 from telethon import TelegramClient
 from dotenv import dotenv_values
@@ -36,6 +36,13 @@ def parse_args():
         type=str,
         default="history",
         help="Directory to save the fetched messages.",
+    )
+    parser.add_argument(
+        "--format",
+        type=str,
+        choices=["json", "csv"],
+        default="json",
+        help="Output format: json or csv.",
     )
     parser.add_argument(
         "--limit",
@@ -159,7 +166,7 @@ class TelegramGroup:
             f"Fetching messages between IDs {min_id} and {max_id}, up to {max_id - min_id + 1} messages."
         )
 
-        all_messages = []
+        self.history = []
         async for message in self.client.iter_messages(
             self.group_name,
             min_id=min_id,
@@ -179,7 +186,7 @@ class TelegramGroup:
 
                 logger.debug(f"Fetched message: {message_obj}")
 
-                all_messages.append(message_obj)
+                self.history.append(message_obj)
 
             else:
                 logger.warning(
@@ -188,7 +195,43 @@ class TelegramGroup:
                 continue
 
             await asyncio.sleep(1)
-        return all_messages
+
+    def save_json(self, file_path: str):
+        """
+        Saves the fetched messages to a JSON file.
+        :param file_path:
+        :return:
+        """
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(self.history, f, default=str, ensure_ascii=False, indent=2)
+
+        logger.info(f"Successfully saved {len(self.history)} messages to {file_path}")
+
+    def save_csv(self, file_path: str):
+        """
+        Saves the fetched messages to a CSV file.
+        :param file_path:
+        :return:
+        """
+        with open(file_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                ["id", "date", "sender_id", "sender_username", "reply_to", "message"]
+            )
+            for msg in self.history:
+                sanitized_message = msg.message.replace("\n", " ").replace("\r", "")
+                writer.writerow(
+                    [
+                        msg.id,
+                        msg.date_str,
+                        msg.sender_id,
+                        msg.sender_username,
+                        msg.reply_to_msg_id,
+                        sanitized_message,
+                    ]
+                )
+
+        logger.info(f"Successfully saved {len(self.history)} messages to {file_path}")
 
 
 async def main():
@@ -235,7 +278,15 @@ async def main():
         group_name = args.group.lower().replace(" ", "_")
         output_dir = str(os.path.join(output_dir, group_name))
         os.makedirs(output_dir, exist_ok=True)
-        filename = f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}.json"
+        if args.format == "csv":
+            filename = (
+                f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}.csv"
+            )
+        elif args.format == "json":
+            filename = (
+                f"{start_date.strftime('%Y%m%d')}-{end_date.strftime('%Y%m%d')}.json"
+            )
+
         output_file = os.path.join(output_dir, filename)
 
         if os.path.exists(output_file):
@@ -243,18 +294,20 @@ async def main():
 
         tgroup = TelegramGroup(client=client, group_name=args.group)
 
-        with open(output_file, "w", encoding="utf-8") as f:
-            all_messages = await tgroup.fetch_history(
-                start_date=start_date,
-                end_date=end_date,
-                limit=args.limit,
-            )
+        await tgroup.fetch_history(
+            start_date=start_date,
+            end_date=end_date,
+            limit=args.limit,
+        )
 
-            json.dump(all_messages, f, default=str, ensure_ascii=False, indent=2)
+        if args.format == "csv":
+            logger.info("Saving messages in CSV format.")
+            tgroup.save_csv(output_file)
+            return
 
-            logger.info(
-                f"Successfully saved {len(all_messages)} messages to {output_file}"
-            )
+        elif args.format == "json":
+            logger.info("Saving messages in JSON format.")
+            tgroup.save_json(output_file)
 
 
 if __name__ == "__main__":
