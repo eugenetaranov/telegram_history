@@ -69,3 +69,11 @@ Fetch messages for a date range:
 ```bash
 python main.py --group "MyGroup" --start "2023-01-01" --end "2023-01-31" --format json
 ```
+
+### Running Tests
+To run the tests, use:
+
+```bash
+pip install -r tests/requirements.txt
+pytest tests/
+```

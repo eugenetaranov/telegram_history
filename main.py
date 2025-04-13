@@ -172,7 +172,7 @@ class TelegramGroup:
             min_id=min_id,
             max_id=max_id + 1,
             limit=limit,
-            reverse=True, # old messages are fetched first
+            reverse=True,  # old messages are fetched first
         ):
             if start_date <= message.date < end_date:
                 message_obj = Message(
