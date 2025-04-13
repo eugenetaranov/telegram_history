@@ -1,4 +1,4 @@
-# Telegram Message Fetcher
+# Telegram group history exporter
 
 A Python application to fetch and export Telegram group messages to JSON or CSV formats.
 
