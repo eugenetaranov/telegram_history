@@ -1,4 +1,4 @@
-# Telegram group history exporter
+# Telegram group history exporter [![Run Tests](https://github.com/eugenetaranov/telegram_history/actions/workflows/test.yml/badge.svg)](https://github.com/eugenetaranov/telegram_history/actions/workflows/test.yml)
 
 A Python application to fetch and export Telegram group messages to JSON or CSV formats.
 
