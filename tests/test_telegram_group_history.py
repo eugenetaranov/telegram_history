@@ -61,7 +61,6 @@ async def test_telegramgroup_fetch_history():
         },
     ]
 
-    # Create AsyncMock objects for each test message
     mock_messages = []
     for msg in test_messages:
         mock_msg = AsyncMock()
@@ -91,7 +90,8 @@ async def test_telegramgroup_fetch_history():
     assert len(group.history) == len(test_messages) - 1
 
     # Verify specific message content
-    assert group.history[0].message == "Hello world"
-    assert group.history[1].message == "Reply to first message"
-    assert group.history[1].reply_to_msg_id == 1
-    assert group.history[2].sender_username == "user1"
+    assert group.history[0].message == test_messages[0]["message"]
+    assert group.history[1].message == test_messages[1]["message"]
+    assert group.history[1].reply_to_msg_id == test_messages[1]["reply_to_msg_id"]
+    assert group.history[2].sender_username == test_messages[2]["username"]
+    assert group.history[-1].id == test_messages[-2]["id"]

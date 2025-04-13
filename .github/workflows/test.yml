@@ -24,6 +24,10 @@ jobs:
         pip install -r requirements.txt
         pip install -r tests/requirements.txt
 
+    - name: Check code formatting
+      run: |
+        black --check --diff .
+
     - name: Run tests
       run: |
         pytest tests/
