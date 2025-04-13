@@ -12,7 +12,9 @@ from unittest.mock import AsyncMock
 import pytest
 
 # Add parent directory to path so Python can find main module
-sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__)))) # pylint: disable=wrong-import-position
+sys.path.insert(
+    0, os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+)  # pylint: disable=wrong-import-position
 from main import TelegramGroup
 
 
