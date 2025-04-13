@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+
+"""
+This script fetches messages from a specified Telegram group within a given date range.
+It supports saving the fetched messages in JSON or CSV format.
+"""
+
 import csv
 import json
 import os
@@ -13,6 +19,12 @@ from dotenv import dotenv_values
 
 
 def parse_args():
+    """
+    Parses command-line arguments for the script.
+
+    Returns:
+        argparse.Namespace: The parsed arguments as a namespace object.
+    """
     parser = argparse.ArgumentParser(
         description="Fetch messages from a Telegram group."
     )
@@ -54,6 +66,15 @@ def parse_args():
 
 
 def load_config():
+    """
+    Loads configuration values from the .env file.
+
+    Returns:
+        dict: A dictionary containing the configuration values (API_ID, API_HASH, APP_NAME).
+
+    Raises:
+        ValueError: If any required configuration value is missing.
+    """
     config = dotenv_values(".env")
 
     if (
@@ -68,6 +89,19 @@ def load_config():
 
 @dataclass
 class Message:
+    """
+    Represents a Telegram message with its metadata.
+
+    Attributes:
+        id (int): The unique identifier of the message.
+        date (datetime): The date and time when the message was sent.
+        date_str (str): The ISO 8601 formatted string of the message date.
+        sender_id (int): The unique identifier of the sender.
+        sender_username (str): The username of the sender, if available.
+        reply_to_msg_id (int): The ID of the message this message is replying to.
+        message (str): The content of the message.
+    """
+
     id: int
     date: datetime
     date_str: str
@@ -78,6 +112,15 @@ class Message:
 
 
 class TelegramGroup:
+    """
+    Represents a Telegram group and provides methods to fetch and save its message history.
+
+    Attributes:
+        client (TelegramClient): The Telethon client used to interact with Telegram.
+        group_name (str): The name of the Telegram group.
+        history (list): A list to store fetched messages.
+    """
+
     def __init__(self, client: TelegramClient, group_name: str):
         self.client = client
         self.group_name = group_name
@@ -236,22 +279,54 @@ class TelegramGroup:
 
 
 def get_date_range(args):
+    """
+    Determines the start and end date range for fetching messages based on the provided arguments.
+
+    Args:
+        args (argparse.Namespace): The parsed command-line arguments.
+
+    Returns:
+        tuple: A tuple containing the start date (`datetime`) and end date (`datetime`).
+               Returns (None, None) if the required arguments are missing.
+    """
     if args.day:
-        start_date = datetime.strptime(args.day, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        start_date = datetime.strptime(args.day, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        )
         end_date = start_date + timedelta(days=1)
     else:
         if not args.start:
             logger.error("Either --day or --start must be provided")
             return None, None
-        start_date = datetime.strptime(args.start, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        start_date = datetime.strptime(args.start, "%Y-%m-%d").replace(
+            tzinfo=timezone.utc
+        )
         if args.end:
-            end_date = datetime.strptime(args.end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end_date = datetime.strptime(args.end, "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
         else:
             end_date = datetime.now(timezone.utc)
     return start_date, end_date
 
 
 def get_output_file(output_dir, group_name, start_date, end_date, file_format):
+    """
+    Generates the output file path for saving fetched messages.
+
+    Args:
+        output_dir (str): The directory where the output file will be saved.
+        group_name (str): The name of the Telegram group.
+        start_date (datetime): The start date of the message range.
+        end_date (datetime): The end date of the message range.
+        file_format (str): The format of the output file ('json' or 'csv').
+
+    Returns:
+        str: The full path to the output file.
+
+    Raises:
+        ValueError: If an invalid file format is specified.
+    """
     group_name = group_name.lower().replace(" ", "_")
     output_dir = str(os.path.join(output_dir, group_name))
     os.makedirs(output_dir, exist_ok=True)
@@ -267,6 +342,20 @@ def get_output_file(output_dir, group_name, start_date, end_date, file_format):
 
 
 async def main():
+    """
+    The main entry point of the script. Parses arguments, loads configuration, and fetches messages
+    from a specified Telegram group within a given date range.
+
+    Steps:
+        1. Parse command-line arguments.
+        2. Load configuration from the .env file.
+        3. Determine the date range for fetching messages.
+        4. Fetch messages using the TelegramClient.
+        5. Save the fetched messages in the specified format (JSON or CSV).
+
+    Raises:
+        ValueError: If required configuration values are missing or invalid arguments are provided.
+    """
     args = parse_args()
     config = load_config()
 
@@ -284,7 +373,9 @@ async def main():
             f"Fetching messages from {args.group} between {start_date} and {end_date}"
         )
 
-        output_file = get_output_file(args.output, args.group, start_date, end_date, args.format)
+        output_file = get_output_file(
+            args.output, args.group, start_date, end_date, args.format
+        )
         if os.path.exists(output_file):
             logger.warning(f"Output file {output_file} already exists. Overwriting.")
 
