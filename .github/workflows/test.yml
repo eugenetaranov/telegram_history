@@ -29,8 +29,11 @@ jobs:
         black --check --diff .
 
     - name: Run pylint
+      env:
+        PYTHONPATH: ${{ github.workspace }}
       run: |
         pylint *.py
+        pylint tests/*.py
 
     - name: Run tests
       run: |

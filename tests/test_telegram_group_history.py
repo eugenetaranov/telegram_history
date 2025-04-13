@@ -1,16 +1,31 @@
-import pytest
+"""
+Unit tests for the TelegramGroup class.
+
+This module contains tests to verify the functionality of the TelegramGroup class,
+including its ability to fetch and process message history from a Telegram group.
+"""
+
 import os
 import sys
-from unittest.mock import AsyncMock, patch
 from datetime import datetime, timezone, timedelta
+from unittest.mock import AsyncMock
+import pytest
 
 # Add parent directory to path so Python can find main module
-sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
+sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__)))) # pylint: disable=wrong-import-position
 from main import TelegramGroup
 
 
 @pytest.mark.asyncio
-async def test_telegramgroup_fetch_history():
+async def test_tg_group_fetch_history():
+    """
+    Tests the `fetch_history` method of the `TelegramGroup` class.
+
+    Verifies that:
+    - Messages within the specified date range are fetched correctly.
+    - Messages outside the date range are excluded.
+    - The content and metadata of fetched messages match the expected values.
+    """
     start_date = datetime(2025, 3, 31, 12, 0, tzinfo=timezone.utc)
     end_date = datetime(2025, 4, 1, 12, 0, tzinfo=timezone.utc)
 
@@ -74,7 +89,7 @@ async def test_telegramgroup_fetch_history():
         mock_messages.append(mock_msg)
 
     # Create an async generator to yield all messages
-    async def mock_iter_messages(*args, **kwargs):
+    async def mock_iter_messages(*args, **kwargs):  # pylint: disable=unused-argument
         for msg in mock_messages:
             yield msg
 
